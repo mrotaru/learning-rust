@@ -1,0 +1,11 @@
+[package]
+name = "ch-10"
+version = "0.1.0"
+authors = ["Mihai Rotaru <mihai.rotaru@gmx.com>"]
+edition = "2018"
+
+[dependencies]
+
+[[bin]]
+name = "ch-10"
+path = "main.rs"
