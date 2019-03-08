@@ -24,3 +24,22 @@ impl Config {
         Ok(Config { query, filename })
     }
 }
+
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    vec![]
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn one_result() {
+        let query = "foo";
+        let contents = "\
+        First line
+        Some foo king text
+        On multiple lines";
+        assert_eq!(vec!["Some foo king text"], search(query, contents));
+    }
+}
