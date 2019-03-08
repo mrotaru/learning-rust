@@ -26,7 +26,13 @@ impl Config {
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    vec![]
+    let mut results = Vec::new();
+    for line in contents.lines() {
+        if line.contains(query) {
+            results.push(line);
+        }
+    }
+    results
 }
 
 #[cfg(test)]
@@ -37,9 +43,9 @@ mod test {
     fn one_result() {
         let query = "foo";
         let contents = "\
-        First line
-        Some foo king text
-        On multiple lines";
+First line
+Some foo king text
+On multiple lines";
         assert_eq!(vec!["Some foo king text"], search(query, contents));
     }
 }
