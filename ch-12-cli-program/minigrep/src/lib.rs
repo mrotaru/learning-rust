@@ -27,12 +27,16 @@ pub fn run(config: Config) -> Result<(), Box<Error>> {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("Not enough arguments");
-        }
-        let query = args[1].clone();
-        let filename = args[2].clone();
+    pub fn new(mut args: std::env::Args) -> Result<Config, &'static str> {
+        args.next(); // first arg is program name; ignore it
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file name"),
+        };
         let case_sensitive_env = env::var("CASE_SENSITIVE").unwrap_or_default();
         Ok(Config { query, filename, case_sensitive: case_sensitive_env.eq("true") })
     }
