@@ -47,6 +47,20 @@ mod tests {
 
     impl Messenger for MockMessenger {
         fn send(&self, message: &str) {
+            // this will result in a panic at runtime:
+            // already borrowed: BorrowMutError
+            // let mut mut_1 = self.sent_messages.borrow_mut();
+            // let mut mut_2 = self.sent_messages.borrow_mut();
+            // mut_1.push(String::from(message));
+            // mut_2.push(String::from(message));
+
+            // this will make the test fail, but not because of
+            // a panic; it will fail because the count will be 2
+            // instead of 1. I guess it does not panic because the
+            // two mutable references are not "live" at the same time
+            // self.sent_messages.borrow_mut().push(String::from(message));
+            // self.sent_messages.borrow_mut().push(String::from(message));
+
             self.sent_messages.borrow_mut().push(String::from(message));
         }
     }
