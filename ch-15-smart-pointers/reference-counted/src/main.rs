@@ -32,4 +32,39 @@ fn main() {
         println!("Reference count 1: {}", Rc::strong_count(&a)); // => 3
     }
     println!("Reference count 2: {}", Rc::strong_count(&a)); // => 2, because c went out of scope, so reference count was decremented
+
+    #[derive(Debug)]
+    enum MaybeNode {
+        NodeRef(Rc<Node>),
+        Nil,
+    }
+
+    #[derive(Debug)]
+    struct Node {
+        value: i32,
+        parent: MaybeNode,
+    }
+
+    let daddy = Node {
+        value: 42,
+        parent: MaybeNode::Nil,
+    };
+
+    let daddy_rc = Rc::new(daddy);
+
+    let child_1 = Node {
+        value: 100,
+        parent: MaybeNode::NodeRef(Rc::clone(&daddy_rc)),
+    };
+    let child_2 = Node {
+        value: 200,
+        parent: MaybeNode::NodeRef(Rc::clone(&daddy_rc)),
+    };
+    println!("daddy_rc: {:?} (strong count: {})", &daddy_rc, Rc::strong_count(&daddy_rc));
+    println!("child_1: {:?}", &child_1);
+    println!("child_2: {:?}", &child_2);
+
+    // won't work: "expected struct `std::rc::Rc`, found struct `main::Node`"
+    // println!("child_1: {:?} (strong count: {})", &child_1, Rc::strong_count(&child_1));
+    // println!("child_2: {:?} (strong count: {})", &child_2, Rc::strong_count(&child_2));
 }
