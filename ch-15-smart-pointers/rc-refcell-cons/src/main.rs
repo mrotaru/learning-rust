@@ -33,8 +33,11 @@ fn main() {
     println!("c: {:?}", c);
 
     // Now, if we change the value that is referenced by `a`, it should be
-    // reflected in `b` and `c`. The Rc will be automatically dereferenced
-    // to the inner RefCell, on which `borrow_mut()` is called:
+    // reflected in `b` and `c`. `value`, which is a reference counted smart
+    // pointer, needs to be dereferenced explicitly, by using `*`; deref
+    // coercion does not come into play, as that only happens for function and
+    // method parameters. Smart pointers deref to the underlying value; in this
+    // case, we get a RefCell, which implements the `borrow_mut` method.
     *value.borrow_mut() = 42;
     println!("a: {:?}", a);
     println!("b: {:?}", b);
