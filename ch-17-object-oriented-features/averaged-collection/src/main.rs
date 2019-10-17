@@ -4,7 +4,10 @@
 
 // Using rust in the good, old object-oriented tradition; AveragedCollection
 // mimics a C++/Java class, as instances of this struct will have data and
-// procedures associated with them.
+// procedures associated with them. This example illustrates encapsulation - the
+// object exposes a public API, with internals being kept private - so the
+// internals can be changed without affecting how the objects are used - the
+// public interface remains the same.
 
 mod my_collections {
     // NOTE: All fields of structs from other modules are private. Given that
@@ -49,7 +52,7 @@ mod my_collections {
         }
     }
 
-    pub fn i_can_access_members () {
+    pub fn i_can_access_fields () {
         let mut c = AveragedCollection { list: Vec::new(), average: 0.0 };
         c.add(10);
         c.add(5);
@@ -64,5 +67,5 @@ fn main() {
     c.add(5);
     println!("Average: {}", c.average());
     // println!("Average field: {}", c.average); // this will not work because fields are private to code outside the module
-    my_collections::i_can_access_members(); // call a function that is inside the module - it does have access to members
+    my_collections::i_can_access_fields(); // call a function that is inside the module - it does have access to members
 }
