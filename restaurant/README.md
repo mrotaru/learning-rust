@@ -1,4 +1,5 @@
 # Chapter 7 - Managing Growing Projects with Packages, Crates, and Modules
+
 This chapter was almost entirely re-written, and the book is out of date: https://doc.rust-lang.org/stable/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
 
 - `std` is a crate containing the Rust standard library, and is composed of [multiple modules](https://doc.rust-lang.org/std/#modules), types and macros - like `fmt`, `io`, etc. 
