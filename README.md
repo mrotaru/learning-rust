@@ -40,4 +40,7 @@ Notes and mini-projects for learning Rust; mainly exercises/examples from "The R
 - [./message-passing](./message-passing)
 - [./mutex](./mutex)
 
+#### object-oriented (ch. 17)
+- [./blog-workflow](./blog-workflow)
+- [./blog-workflow-types](./blog-workflow-types)
 
