@@ -1,5 +1,5 @@
 pub struct Post {
-    state: Option<Box<dyn State>>,
+    pub state: Option<Box<dyn State>>, // public just for debugging
     content: String,
 }
 
@@ -26,11 +26,18 @@ impl Post {
             self.state = Some(s.approve())
         }
     }
+    pub fn reject(&mut self) {
+        if let Some(s) = self.state.take() {
+            self.state = Some(s.reject())
+        }
+    }
 }
 
 trait State {
+    fn name(&self) -> &'static str;
     fn request_review(self: Box<Self>) -> Box<dyn State>;
     fn approve(self: Box<Self>) -> Box<dyn State>;
+    fn reject(self: Box<Self>) -> Box<dyn State>;
     fn content<'a>(&self, _post: &'a Post) -> &'a str {
         ""
     }
@@ -45,10 +52,16 @@ struct PendingReview {}
 struct Approved {}
 
 impl State for Draft {
+    fn name(&self) -> &'static str {
+        "Draft"
+    }
     fn request_review(self: Box<Self>) -> Box<dyn State> {
         Box::new(PendingReview {})
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
         self
     }
     fn add_text(&self, post: &Post, new_text: &str) -> String {
@@ -59,8 +72,14 @@ impl State for Draft {
 }
 
 impl State for PendingReview {
+    fn name(&self) -> &'static str {
+        "PendingReview"
+    }
     fn request_review(self: Box<Self>) -> Box<dyn State> {
         self
+    }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
+        Box::new(Draft {})
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
         Box::new (Approved {})
@@ -68,15 +87,26 @@ impl State for PendingReview {
 }
 
 impl State for Approved {
+    fn name(&self) -> &'static str {
+        "Approved"
+    }
     fn request_review(self: Box<Self>) -> Box<dyn State> {
         self
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
         self
     }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
     fn content<'a>(&self, post: &'a Post) -> &'a str {
         &post.content
     }
+}
+
+use std::any::TypeId;
+fn type_id<T: 'static + ?Sized>(_: &T) -> TypeId {
+    TypeId::of::<T>()
 }
 
 fn main() {
@@ -85,7 +115,12 @@ fn main() {
     assert_eq!("", post.content());
     post.request_review();
     assert_eq!("", post.content());
+    post.reject(); // goes back to draft
+    // assert_eq!(type_id(&post.state), TypeId::of::<Draft>()); // false - ref
+    assert_eq!(post.state.as_ref().unwrap().name(), "Draft");
+    post.request_review(); // pending
     post.approve();
+    assert_eq!("foobar", post.content());
     post.add_text("baz"); // won't change text value
     assert_eq!("foobar", post.content());
 }
