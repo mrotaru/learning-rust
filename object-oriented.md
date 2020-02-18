@@ -26,4 +26,4 @@ As an alternative, the book suggests encoding the state directly in the type:
 - have `Post::new()` return a `DraftPost`
 - `DraftPost` has an `request_review()` method returning a `PendingReviewPost`
 - `PendingReviewPost` has an `approve()` method returning a `Post`
-- only `Post` has a `content()` method
+- only `Post` has a `content()` method; others hold state (`content`) as a private member
