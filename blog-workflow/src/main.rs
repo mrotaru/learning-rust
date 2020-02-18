@@ -48,7 +48,9 @@ trait State {
 }
 
 struct Draft {}
-struct PendingReview {}
+struct PendingReview {
+    approve_count: i32,
+}
 struct Approved {}
 
 impl State for Draft {
@@ -56,7 +58,7 @@ impl State for Draft {
         "Draft"
     }
     fn request_review(self: Box<Self>) -> Box<dyn State> {
-        Box::new(PendingReview {})
+        Box::new(PendingReview { approve_count: 0 })
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
         self
@@ -82,7 +84,11 @@ impl State for PendingReview {
         Box::new(Draft {})
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
-        Box::new (Approved {})
+        if self.approve_count < 1 {
+            Box::new (PendingReview { approve_count: self.approve_count + 1 })
+        } else {
+            Box::new (Approved {})
+        }
     }
 }
 
@@ -119,7 +125,12 @@ fn main() {
     // assert_eq!(type_id(&post.state), TypeId::of::<Draft>()); // false - ref
     assert_eq!(post.state.as_ref().unwrap().name(), "Draft");
     post.request_review(); // pending
+    assert_eq!(post.state.as_ref().unwrap().name(), "PendingReview");
     post.approve();
+    assert_eq!("", post.content()); // content changes when approved...
+    assert_eq!(post.state.as_ref().unwrap().name(), "PendingReview"); // still pending, needs 2 approves
+    post.approve();
+    assert_eq!(post.state.as_ref().unwrap().name(), "Approved"); // still pending, needs 2 approves
     assert_eq!("foobar", post.content());
     post.add_text("baz"); // won't change text value
     assert_eq!("foobar", post.content());
