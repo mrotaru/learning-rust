@@ -27,3 +27,15 @@ As an alternative, the book suggests encoding the state directly in the type:
 - `DraftPost` has an `request_review()` method returning a `PendingReviewPost`
 - `PendingReviewPost` has an `approve()` method returning a `Post`
 - only `Post` has a `content()` method; others hold state (`content`) as a private member
+
+## Additional Tasks
+
+1) implement `reject()`
+```
+       request_review()            approve()
+Draft ­­------------------→ Pending -----------→ Published
+            reject()               approve()
+Draft ­←------------------ Pending -----------→ Published
+```
+2) require post to be approved twice before allowing publication
+3) content should only be modifiable during drafting stage
