@@ -1,11 +1,15 @@
 # Calling C Code From Rust
 
-None of these worked; Windows 10, with Scoop-installed rust and clang:
-- https://liufuyang.github.io/2020/02/02/call-c-in-rust.html
-- https://doc.rust-lang.org/nomicon/ffi.html
+- Unsafe: https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#using-extern-functions-to-call-external-code
+- FFI: https://doc.rust-lang.org/nomicon/ffi.html
+- C, C++: https://liufuyang.github.io/2020/02/02/call-c-in-rust.html
 - https://blog.jfo.click/calling-a-c-function-from-rust/
+- C++: http://gernotklingler.com/blog/creating-using-shared-libraries-different-compilers-different-operating-systems/
+- static: https://stackoverflow.com/questions/43826572/where-should-i-place-a-static-library-so-i-can-link-it-with-a-rust-program
+- https://www.reddit.com/r/rust/comments/2w0695/problem_linking_to_c_shared_libraries/
+- makefiles: https://amirkoblog.wordpress.com/2018/07/05/calling-rust-code-from-c-c/
 
-Getting a linking error:
+On Windows 10, scoop-installed `rust` and `clang`, getting a linking error:
 
 ```
 $ rustc -v -l doubler.lib main.rs
@@ -42,3 +46,9 @@ $ ./main.exe
 Note:
 - works with or without a space after `L` in `-L.`
 - name of library must end with `.lib`, but the extension must not be included in `rustc`
+
+Related:
+- `ld -ldoubler --verbose` - shows searched files (https://stackoverflow.com/a/21647591/447661)
+- on Fedora: `dnf provides /usr/lib64/libinput.so`
+- `gcc -print-search-dirs | sed '/^lib/b 1;d;:1;s,/[^/.][^/]*/\.\./,/,;t 1;s,:[^=]*=,:;,;s,;,;  ,g' | tr \; \\012` ([source](https://stackoverflow.com/a/21610523/447661))
+- long (but allegedly good) read on linkers: https://lwn.net/Articles/276782/
