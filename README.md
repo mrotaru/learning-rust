@@ -50,3 +50,4 @@ Notes and mini-projects for learning Rust; mainly exercises/examples from "The R
 
 ## advanced features (ch. 19)
 - [./unsafe-pointers](./unsafe-pointers/src/main.rs)
+- [./call-c-from-rust](./call-c-from-rust/src/main.rs)
