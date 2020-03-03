@@ -47,3 +47,6 @@ Notes and mini-projects for learning Rust; mainly exercises/examples from "The R
 ### patterns (ch. 18)
 - ref: https://doc.rust-lang.org/nightly/reference/patterns.html
 - [./simple-patterns](./simple-patterns/src/main.rs)
+
+## advanced features (ch. 19)
+- [./unsafe-pointers](./unsafe-pointers/src/main.rs)
