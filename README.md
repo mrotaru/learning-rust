@@ -44,10 +44,11 @@ Notes and mini-projects for learning Rust; mainly exercises/examples from "The R
 - [./blog-workflow](./blog-workflow)
 - [./blog-workflow-types](./blog-workflow-types)
 
-### patterns (ch. 18)
+#### patterns (ch. 18)
 - ref: https://doc.rust-lang.org/nightly/reference/patterns.html
 - [./simple-patterns](./simple-patterns/src/main.rs)
 
-## advanced features (ch. 19)
+#### advanced features (ch. 19)
 - [./unsafe-pointers](./unsafe-pointers/src/main.rs)
 - [./call-c-from-rust](./call-c-from-rust/src/main.rs)
+- [./advanced-lifetimes](./advanced-lifetimes)
