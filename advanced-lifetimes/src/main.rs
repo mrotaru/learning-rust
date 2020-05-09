@@ -2,13 +2,14 @@ struct Context<'a> {
     raw_text: &'a str,
 }
 
-// use lifetimes to underscore that the returned reference lifetime is not
+// Use lifetimes to indicate that the returned reference lifetime is not
 // the same as the lifetime of Context
 struct Parser<'c, 's> {
     context: &'c Context<'s>,
 }
 
-// This is no longer necessary and it is not even valid syntax:
+// In current Rust (1.43) it is no longer necessary to explicitly specify that
+// one lifetime ('s) must live at least as long as another one ('c). Previously:
 // impl<'c, 's> Parser<'c, 's: 'c> {
 impl<'c, 's> Parser<'c, 's> {
     fn parse(&self) -> Result<(), &'s str> {
