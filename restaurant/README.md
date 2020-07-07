@@ -2,6 +2,16 @@
 
 This chapter was almost entirely re-written, and the book is out of date: https://doc.rust-lang.org/stable/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
 
+## Packages and Crates
+- package - can contain at most one library crate - but nr of binary crates (in a package) is unlimited
+- `Cargo.toml` ⇒ package
+- `src/main.rs` ⇒ binary crate with same name as the package, with `main.rs` as the root
+- `src/lib.rs` ⇒ library crate with same name as the package, with `lib.rs` as the root
+- when building, `rustc` uses the root as the entry point
+- both `src/main.rs` and `src/lib.rs` present ⇒ two crates, both with the same name as the package
+- have `src/bin` folder, with multiple `*.rs` files ⇒ each file is a binary crate; crate name is file name without ext
+
+## Modules and Paths
 - `std` is a crate containing the Rust standard library, and is composed of [multiple modules](https://doc.rust-lang.org/std/#modules), types and macros - like `fmt`, `io`, etc. 
 - the `std` crate is available to all Rust modules by default.
 - use `use` to bring things in scope
