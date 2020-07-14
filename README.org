@@ -1,0 +1,858 @@
+* Learning Rust
+
+Notes and mini-projects for learning Rust; mainly exercises/examples from "The Rust Programming Language", 1st Edition.
+
+#+NAME: foo
+#+BEGIN_SRC rust
+#+END_SRC
+
+** Ownership (ch. 4)
+   - stack vs heap: https://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap
+** Modules (ch. 7)
+   
+This chapter was almost entirely re-written, so 1st ed. of the book is out of date: https://doc.rust-lang.org/stable/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
+
+*** Packages and Crates
+- package - can contain at most one library crate - but nr of binary crates (in a package) is unlimited
+- `Cargo.toml` ⇒ package
+- `src/main.rs` ⇒ binary crate with same name as the package, with `main.rs` as the root
+- `src/lib.rs` ⇒ library crate with same name as the package, with `lib.rs` as the root
+- when building, `rustc` uses the root as the entry point
+- both `src/main.rs` and `src/lib.rs` present ⇒ two crates, both with the same name as the package
+- have `src/bin` folder, with multiple `*.rs` files ⇒ each file is a binary crate; crate name is file name without ext
+
+*** Modules and Paths
+- `std` is a crate containing the Rust standard library, and is composed of [multiple modules](https://doc.rust-lang.org/std/#modules), types and macros - like `fmt`, `io`, etc. 
+- the `std` crate is available to all Rust modules by default.
+- use `use` to bring things in scope
+- `self` is current module, `super` is parent module - used for relative paths
+- `crate` is current crate (root scope), can be used to compose absolute paths
+- `as` can be used to name imported things - `use std::io::Result as IoResult`
+   #+BEGIN_SRC rust
+     use std::fmt; // std is a crate, fmt a module; contains a 'Result' type
+     use std::io; // also contains a Result type
+     // use std::io::Result; // import specific types/structs/etc; in this case not recommended - stay explicit about which Result you're reffering to
+     fn function1() -> fmt::Result { }
+     fn function2() -> io::Result<()> { }
+   #+END_SRC
+
+   #+RESULTS:
+
+- can combine `pub` and `use` - bring in scope, **and** make public: `pub use crate::front_of_house::hosting`
+- nested paths for complex imports:
+   #+BEGIN_SRC rust
+     use std::io;
+     use std::cmp::Ordering;
+     // above two lines can be replaced with:
+     use std::{cmp::Ordering, io};
+   #+END_SRC
+   
+   #+BEGIN_SRC rust
+     use std::io;
+     use std::io::Write;
+     // above two lines can be replaced with:
+     use std::io::{self, Write};
+   #+END_SRC
+
+   #+BEGIN_SRC rust
+     use std::collections::*; // brings in scope **all** public items (!)
+   #+END_SRC
+
+- modules are resolved using module name as a basename for the file:
+   #+BEGIN_SRC rust
+     // will work if file structure is: src/front_of_house/hosting.rs
+     // also if: src/front_of_house.rs exports the `hosting` module
+     // of course, it will also work if `front_of_house` module is defined in the same file
+     pub use crate::front_of_house::hosting
+   #+END_SRC
+
+*** Restaurant Example
+   #+BEGIN_SRC rust
+     mod front_of_house {
+         pub mod hosting {
+             //fn add_to_waitlist() {} // function would still be private, even if module is public
+             pub fn add_to_waitlist() {
+                 // `super` can be used as '..' - makes path relative to parent module
+                 // super::super::super::take_order(); // E: "too many initial super's"
+                 super::serving::take_order();
+                 println!("add_to_waitlist");
+             }
+
+             fn seat_at_table() {}
+         }
+
+         // for access by sibling modules, no need for 'pub' for module; but 'pub' is
+         // still required for the individual functions.
+         mod serving {
+             pub fn take_order() {
+                 println!("take_order: This probably makes no sense...");
+             }
+
+             fn serve_order() {}
+
+             fn take_payment() {}
+         }
+     }
+
+     mod back_of_house {
+         pub struct Breakfast {
+             pub toast: String, // public - `toast` can be changed by code outside the module
+             seasonal_fruit: String, // ... but `seasonal_fruit` can't - private by default
+         }
+
+         // unlike structs, where a 'pub' doesn't mean access to fields, if an enum is 'pub',
+         // all values are also 'pub'
+         pub enum Appetizer {
+             Soup,
+             Salad,
+         }
+
+         impl Breakfast {
+             pub fn summer(toast: &str) -> Breakfast {
+                 Breakfast {
+                     toast: String::from(toast),
+                     seasonal_fruit: String::from("peaches"),
+                 }
+             }
+         }
+     }
+
+     pub fn eat_at_restaurant() {
+         // two ways of accessing the same functionality:
+         crate::front_of_house::hosting::add_to_waitlist(); // 'crate' used as '/' would be in the file system - denotes root
+         front_of_house::hosting::add_to_waitlist();
+
+         let mut meal = crate::back_of_house::Breakfast::summer("Rye"); // works - can change 'pub' field
+         // meal.seasonal_fruit = String::from("blueberries"); // doesn't work - `seasonal_fruit` is private field
+     }
+   #+END_SRC
+
+** Unit Testing
+   #+BEGIN_SRC rust
+     #[derive(Debug)]
+     pub struct Rectangle {
+         length: u32,
+         width: u32,
+     }
+
+     impl Rectangle {
+         pub fn can_hold(&self, other: &Rectangle) -> bool {
+             self.length > other.length && self.width > other.width
+         }
+     }
+
+     #[cfg(test)]
+     mod tests {
+         use super::*;
+
+         #[test]
+         fn larger_can_hold_smaller() {
+             let larger = Rectangle { length: 2, width: 2 };
+             let smaller = Rectangle { length: 1, width: 1 };
+             assert!(larger.can_hold(&smaller));
+         }
+
+         #[test]
+         fn smaller_cannot_hold_larger() {
+             let larger = Rectangle { length: 2, width: 2 };
+             let smaller = Rectangle { length: 1, width: 1 };
+             let can_hold = smaller.can_hold(&larger);
+             assert!(can_hold == false, "Was expecting false, got: {}", can_hold);
+         }
+     }
+   #+END_SRC
+
+** Error Handling (ch. 9)
+#+NAME: error.rs
+#+BEGIN_SRC rust
+use std::error::Error;
+use std::fs::File;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let f = File::open("hello.txt")?;
+    Ok(())
+}
+#+END_SRC
+
+#+RESULTS: error.rs
+
+** Generic Types, Traits, and Lifetimes (ch. 10)
+#+NAME: basic-trait
+#+BEGIN_SRC rust
+  trait Foo {
+      fn f1(&mut self) -> i32;
+  }
+  struct Bar { x: i32, };
+  impl Foo for Bar {
+      fn f1(&mut self) -> i32 {
+          self.x = 42;
+          42
+      }
+  }
+#+END_SRC
+
+#+NAME: gui-library
+#+BEGIN_SRC rust
+  // using trait objects - contained elements can be of any type, as long as they implement the `Draw` trait
+  mod gui_lib_trait_object {
+      pub trait Draw {
+          fn draw(&self);
+      }
+
+      pub struct Screen {
+          pub components: Vec<Box<dyn Draw>>,
+      }
+
+      impl Screen {
+          pub fn run(&self) {
+              for component in self.components.iter() {
+                  component.draw();
+              }
+          }
+      }
+  }
+
+  // using generic type parameter - all contained elements must be of same type
+  mod gui_lib_generic_type_parameter {
+      pub trait Draw {
+          fn draw(&self);
+      }
+
+      pub struct Screen<T: Draw> {
+          pub components: Vec<T>,
+      }
+
+      impl<T> Screen<T> where T: Draw {
+          pub fn run(&self) {
+              for component in self.components.iter() {
+                  component.draw();
+              }
+          }
+      }
+  }
+
+  use gui_lib_trait_object::{Draw, Screen};
+
+  fn main() {
+      #[derive(Debug)]
+      pub struct Button {
+          pub width: u32,
+          pub height: u32,
+          pub label: String,
+      }
+
+      impl Draw for Button {
+          fn draw(&self) {
+              println!("{:?}", &self);
+          }
+      }
+
+      #[derive(Debug)]
+      pub struct SelectBox {
+          width: u32,
+          height: u32,
+          options: Vec<String>,
+      }
+
+      impl Draw for SelectBox {
+          fn draw(&self) {
+              println!("{:?}", &self);
+          }
+      }
+
+      let screen = Screen {
+          components: vec![
+              Box::new(Button {
+                  width: 50,
+                  height: 10,
+                  label: String::from("Button 1"),
+              }),
+              Box::new(SelectBox {
+                  width: 50,
+                  height: 10,
+                  options: vec![
+                      String::from("Option 1"),
+                      String::from("Option 2"),
+                  ],
+              }),
+          ]
+      };
+
+      screen.run();
+  }
+#+END_SRC
+
+*** Constructor ?
+- a function, ~new~; does not take ~self~ as parameter
+- invoked as ~Foo::new(1)~
+#+NAME: constructor
+#+BEGIN_SRC rust
+  struct Foo {
+    bar: i32,
+  }
+  impl Foo {
+    fn new(i: i32) -> Foo {
+      Foo { bar: i }
+    }
+  }
+  let f1 = Foo::new(1);
+  let f1 = Foo::new(2);
+#+END_SRC
+
+*** Iterator field over borrowed string ?
+    
+#+NAME: iterator-field
+#+BEGIN_SRC rust
+  struct Foo {
+      // it: Option<dyn Iterator<Item=char>>, //  doesn't have a size known at compile-time
+    it: Option<Box<dyn Iterator<Item=char>>>,
+  }
+  impl Foo {
+      fn new() -> Foo {
+          Foo { it: None }
+      }
+      fn bar(&mut self, input: &str) -> Vec<Box<i32>> {
+        self.it = Some(Box::new(input.chars()));
+        vec![Box::new(42)]
+      }
+  }
+#+END_SRC
+
+The code above results in an error:
+
+#+BEGIN_SRC
+error[E0621]: explicit lifetime required in the type of `input`
+  --> rust-src-HKcdr8.rs:11:17
+   |
+10 |     fn bar(&mut self, input: &str) -> Vec<Box<i32>> {
+   |                              ---- help: add explicit lifetime `'static` to the type of `input`: `&'static str`
+11 |       self.it = Some(Box::new(input.chars()));
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetime `'static` required
+#+END_SRC
+
+#+NAME: iterator-field
+#+BEGIN_SRC rust
+  struct Foo {
+    it: Option<Box<dyn Iterator<Item=char>>>,
+  }
+  impl Foo {
+      fn new() -> Foo {
+          Foo { it: None }
+      }
+      fn bar(&mut self, input: &str) -> Vec<Box<i32>> {
+        self.it = Some(Box::new(input.chars()));
+        vec![Box::new(42)]
+      }
+  }
+#+END_SRC
+
+#+RESULTS: iterator-field
+
+Related: https://stackoverflow.com/questions/25959075/why-explicit-lifetime-bound-required-for-boxt-in-struct
+At the time, this would have failed but with current Rust it's fine:
+#+NAME: boxed-trait
+#+BEGIN_SRC rust
+  trait A {
+      fn f(&self);
+  }
+
+  struct S {
+      a: Box<A>,
+  }
+#+END_SRC
+
+*** static Lifetime
+    - https://doc.rust-lang.org/stable/rust-by-example/scope/lifetime/static_lifetime.html
+    - two use cases: reference with static lifetime, and as part of a trait bound
+#+BEGIN_SRC rust
+  let s: &'static str = "hello world"; // A reference with 'static lifetime
+  fn f<T>(x: T) where T: 'static {} // 'static as part of a trait bound
+#+END_SRC
+    - if ref, stored in the RO bin section but can still be coerced to a shorter lifetime
+    - two ways of creating vars w static lifetime: static constants and static literal strings
+    - static trait bound ⇒ the type does not contain any non-static references
+    - any owned data always passes a 'static lifetime bound, but a reference to that owned data generally does not
+#+BEGIN_SRC rust
+  fn foo(x: i32 'static) {}
+  fn bar() {
+    let a = 42;
+    foo(a);
+    foo(&a);
+  }
+#+END_SRC
+
+#+RESULTS:
+
+** Iterators
+** Closures
+   - can be returned - https://doc.rust-lang.org/std/keyword.impl.html
+#+BEGIN_SRC rust
+  fn thing_returning_closure() -> impl Fn(i32) -> bool {
+      println!("here's a closure for you!");
+      |x: i32| x % 3 == 0
+  }
+  let f = thing_returning_closure();
+  println!("{}", f(9));
+  println!("{}", f(4));
+#+END_SRC
+
+** Smart Pointers (ch. 15)
+- references borrow; but smart pointers can actually **own** the data they point to
+- `String` and `Vec<T>` are smart pointers - ows some memory, and have extra meta-data and capabilities
+- structs that implement `Deref` and `Drop` traits
+*** Custom Box Smart Pointer
+  #+BEGIN_SRC rust
+    use std::ops::Deref;
+
+    struct MyBox<T>(T);
+
+    impl<T> MyBox<T> {
+        fn new(x: T) -> MyBox<T> {
+            MyBox(x)
+        }
+    }
+
+    impl <T> Deref for MyBox<T> {
+        type Target = T; // declaring an associated type (?)
+
+        fn deref(&self) -> &T {
+            // We return a reference, because if we returned the value
+            // itself, it would be moved out; but we want smart pointers
+            // to own their values.
+            &self.0 // this .0 syntax, don't think I've seen it before (?)
+        }
+
+    }
+
+    // If we get a ref to something that is a ref to the required type (&str), and
+    // it implements the Deref trait, Rust will apply deref automatically. A String
+    // can be derefed to a string slice:
+    // https://doc.rust-lang.org/std/string/struct.String.html#impl-Deref.
+
+    // So, in a way, this auto-deref functionality is multi-level; if Rust can
+    // obtain what it wants (in this case, a string slice) by applying deref more
+    // than once, it will do it.
+    fn give_me_a_string_slice(slice: &str) {
+        println!("Delicious slice: {}", slice);
+    }
+
+    fn main() {
+        let x = 5;
+        let boxed_x = MyBox::new(x);
+        assert_eq!(5, x);
+
+        // this wouldn't work if we didn't implement the Deref trait
+        // and is equivalent to *(y.deref())
+        assert_eq!(5, *boxed_x);
+
+        let slice = MyBox::new(String::from("cake"));
+        give_me_a_string_slice(&slice);
+        // without auto-deref, we'd have to build the slice from a String manually:
+        give_me_a_string_slice(&(*slice)[..]); // eew, ugly
+
+        // a box, inside a box, which can be derefed:
+        let box_in_a_box = MyBox::new(slice);
+        give_me_a_string_slice(&box_in_a_box); // wow, amaze
+    }
+  #+END_SRC
+
+  #+RESULTS:
+  : Delicious slice: cake
+  : Delicious slice: cake
+  : Delicious slice: cake
+
+*** RefCell Cons
+  #+BEGIN_SRC rust
+    use List::{Cons, Nil};
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    #[derive(Debug)]
+    enum List {
+        Cons(Rc<RefCell<i32>>, Rc<List>),
+        Nil,
+    }
+
+    fn main() {
+        let value = Rc::new(RefCell::new(10));
+        let a = Rc::new(Cons(Rc::clone(&value), Rc::new(Nil)));
+
+        // Why clone &a ? Because if we used  just `a`, then it would
+        // be moved into `b`. And if we used just a reference, without
+        // cloning, then it would not be reference counted - we'd probably
+        // have to use lifetimes
+        let b = Cons(Rc::new(RefCell::new(15)), Rc::clone(&a));
+        let c = Cons(Rc::new(RefCell::new(20)), Rc::clone(&a));
+        /*
+        Result:
+
+        b (15) -
+                 \
+                  > --> a (10) --> Nil
+                 /
+        c (20) -
+
+        ,*/
+        println!("a: {:?}", a);
+        println!("b: {:?}", b);
+        println!("c: {:?}", c);
+
+        // Now, if we change the value that is referenced by `a`, it should be
+        // reflected in `b` and `c`. `value`, which is a reference counted smart
+        // pointer, needs to be dereferenced explicitly, by using `*`; deref
+        // coercion does not come into play, as that only happens for function and
+        // method parameters. Smart pointers deref to the underlying value; in this
+        // case, we get a RefCell, which implements the `borrow_mut` method.
+        ,*value.borrow_mut() = 42;
+        println!("a: {:?}", a);
+        println!("b: {:?}", b);
+        println!("c: {:?}", c);
+    }
+  #+END_SRC
+
+  #+RESULTS:
+  : a: Cons(RefCell { value: 10 }, Nil)
+  : b: Cons(RefCell { value: 15 }, Cons(RefCell { value: 10 }, Nil))
+  : c: Cons(RefCell { value: 20 }, Cons(RefCell { value: 10 }, Nil))
+  : a: Cons(RefCell { value: 42 }, Nil)
+  : b: Cons(RefCell { value: 15 }, Cons(RefCell { value: 42 }, Nil))
+  : c: Cons(RefCell { value: 20 }, Cons(RefCell { value: 42 }, Nil))
+
+*** Recap
+    #+NAME: recap.rs
+    #+BEGIN_SRC rust
+      use std::rc::Rc;
+      use std::ops::Deref;
+
+      struct MyPointer<T> {
+          value: T,
+      }
+
+      impl<T> MyPointer<T> {
+          fn new(x: T) -> MyPointer<T> {
+              MyPointer {
+                  value: x,
+              }
+          }
+      }
+
+      fn add(a: &i32, b: &i32) -> i32 {
+          a + b
+      }
+
+      // Box - "take value, package it in a box, send it to some storage facility;
+      // keep receipt". The receipt is the pointer; storage facility is heap
+      // memory. Works for simple values (like ints), not just structures -
+      // although it is rarely useful to box scalars.
+      let a = 42;
+      let boxed = Box::new(a);
+
+      // Deref coercion is applied to function and method params, when types mismatch
+      // and the argument is a reference that can deref into the required type.
+      // println!("{}", a + boxed); // won't work; deref coercions apply only to refs; `boxed` is not a ref
+      println!("add operator: {}", a + *boxed); // will work
+      // println!("{}", add(&a, boxed)); // won't work - `boxed` is not a reference, so will not be derefed
+      println!("add fn: {}", add(&a, &boxed)); // will work
+
+      // Deref coercion can be applied recursively
+      let boxed_in_a_box = Box::new(&boxed);
+      println!("add fn, boxed in a box: {}", add(&a, &boxed_in_a_box));
+
+      impl<T> Deref for MyPointer<T> {
+          type Target = T;
+          fn deref(&self) -> &T {
+              &self.value
+          }
+      }
+
+      let b = Rc::new(MyPointer {
+          value: 42,
+      });
+
+      println!("add fn with MyPointer: {}", add(&a, &b)); // will work, because b can deref to &int (self.value is int, and Deref returns &self.value)
+  #+END_SRC
+
+  #+RESULTS: recap.rs
+  : add operator: 84
+  : add fn: 84
+  : add fn, boxed in a box: 84
+  : add fn with MyPointer: 84
+
+*** Interior Mutability
+    
+    #+NAME: interior-mutability.rs
+    #+BEGIN_SRC rust
+      pub trait Messenger {
+          fn send(&self, msg: &str);
+      }
+
+      pub struct LimitTracker<'a, T: 'a + Messenger> {
+          messenger: &'a T,
+          value: usize,
+          max: usize,
+      }
+
+      impl<'a, T> LimitTracker<'a, T> where T: Messenger {
+          pub fn new(messenger: &T, max: usize) -> LimitTracker<T> {
+              LimitTracker {
+                  messenger,
+                  value: 0,
+                  max,
+              }
+          }
+
+          pub fn set_value(&mut self, value: usize) {
+              self.value = value;
+              let percentage_of_max = self.value as f64 / self.max as f64;
+              if percentage_of_max >= 0.75 && percentage_of_max < 0.9 {
+                  self.messenger.send("Over 75% of quota!");
+              } else if percentage_of_max >= 0.9 && percentage_of_max < 1.0 {
+                  self.messenger.send("Over 90% of quota!");
+              } else if percentage_of_max >= 1.0 {
+                  self.messenger.send("Quota consumed!");
+              }
+          }
+      }
+
+      use std::cell::RefCell;
+
+      struct MockMessenger {
+          sent_messages: RefCell<Vec<String>>,
+      }
+
+      impl MockMessenger {
+          fn new() -> MockMessenger {
+              MockMessenger { sent_messages: RefCell::new(vec![]) }
+          }
+      }
+
+      impl Messenger for MockMessenger {
+          fn send(&self, message: &str) {
+              // this will result in a panic at runtime:
+              // already borrowed: BorrowMutError
+              // let mut mut_1 = self.sent_messages.borrow_mut();
+              // let mut mut_2 = self.sent_messages.borrow_mut();
+              // mut_1.push(String::from(message));
+              // mut_2.push(String::from(message));
+
+              // this will make the test fail, but not because of
+              // a panic; it will fail because the count will be 2
+              // instead of 1. I guess it does not panic because the
+              // two mutable references are not "live" at the same time
+              // self.sent_messages.borrow_mut().push(String::from(message));
+              // self.sent_messages.borrow_mut().push(String::from(message));
+
+              self.sent_messages.borrow_mut().push(String::from(message));
+          }
+      }
+
+      let mock_messenger = MockMessenger::new();
+      let mut limit_tracker = LimitTracker::new(&mock_messenger, 100);
+      limit_tracker.set_value(80);
+      assert_eq!(mock_messenger.sent_messages.borrow().len(), 2);
+    #+END_SRC
+
+    #+RESULTS: interior-mutability.rs
+
+*** Reference Counting
+    #+BEGIN_SRC rust
+      use std::rc::Rc;
+
+      fn main() {
+          enum BoxList {
+              Cons(char, Box<BoxList>),
+              Nil,
+          }
+          use BoxList::{Cons, Nil};
+          let a = Cons('a', Box::new(Nil));
+          // trying to create a shared object; so 'a' is shared by b and c.
+          // This isn't going to work, because a is moved into b, and moved
+          // values cannot be used after being moved:
+          // let b = Cons('b', Box::new(a));
+          // let c = Cons('c', Box::new(a));
+
+          // We must use the `Rc` (reference counted) smart pointer.
+          enum RcList {
+              Cons(char, Rc<RcList>),
+              Nil,
+          }
+          use RcList::{Cons as RcCons, Nil as RcNil};
+          let a = Rc::new(RcCons('a', Rc::new(RcNil)));
+          // note: `clone` DOES NOT make a deep clone, as you might expect
+          // From docs of Rc implementation of the 'Clone' trait: 
+          // "creates another pointer to the same inner value, increasing the
+          // strong reference count."
+          // https://doc.rust-lang.org/std/rc/struct.Rc.html#impl-Clone
+          // https://doc.rust-lang.org/std/clone/trait.Clone.html
+          let b = Rc::new(RcCons('b', Rc::clone(&a)));
+          {
+              let c = Rc::new(RcCons('c', Rc::clone(&a)));
+              println!("Reference count 1: {}", Rc::strong_count(&a)); // => 3
+          }
+          println!("Reference count 2: {}", Rc::strong_count(&a)); // => 2, because c went out of scope, so reference count was decremented
+
+          #[derive(Debug)]
+          enum MaybeNode {
+              NodeRef(Rc<Node>),
+              Nil,
+          }
+
+          #[derive(Debug)]
+          struct Node {
+              value: i32,
+              parent: MaybeNode,
+          }
+
+          let daddy = Node {
+              value: 42,
+              parent: MaybeNode::Nil,
+          };
+
+          let daddy_rc = Rc::new(daddy);
+
+          let child_1 = Node {
+              value: 100,
+              parent: MaybeNode::NodeRef(Rc::clone(&daddy_rc)),
+          };
+          let child_2 = Node {
+              value: 200,
+              parent: MaybeNode::NodeRef(Rc::clone(&daddy_rc)),
+          };
+          println!("daddy_rc: {:?} (strong count: {})", &daddy_rc, Rc::strong_count(&daddy_rc));
+          println!("child_1: {:?}", &child_1);
+          println!("child_2: {:?}", &child_2);
+
+          // won't work: "expected struct `std::rc::Rc`, found struct `main::Node`"
+          // println!("child_1: {:?} (strong count: {})", &child_1, Rc::strong_count(&child_1));
+          // println!("child_2: {:?} (strong count: {})", &child_2, Rc::strong_count(&child_2));
+      }
+    #+END_SRC
+
+    #+RESULTS:
+
+*** Reference Cycle
+    #+BEGIN_SRC rust
+      use std::rc::Rc;
+      use std::cell::RefCell;
+      use List::{Cons, Nil};
+
+      #[derive(Debug)]
+      enum List {
+          Cons(i32, RefCell<Rc<List>>),
+          Nil,
+      }
+
+      impl List {
+          fn tail(&self) -> Option<&RefCell<Rc<List>>> {
+              match *self {
+                  List::Cons(_, ref item) => Some(item),
+                  Nil => None,
+              }
+          }
+      }
+
+      fn main() {
+          let a = Rc::new(Cons(5, RefCell::new(Rc::new(Nil))));
+          println!("a rc: {}", Rc::strong_count(&a));
+          println!("a tail: {:?}", a.tail());
+
+          let b = Rc::new(Cons(10, RefCell::new(Rc::clone(&a))));
+          println!("a rc after creating b: {}", Rc::strong_count(&a));
+          println!("b rc: {}", Rc::strong_count(&b));
+          println!("b tail: {:?}", b.tail());
+
+          if let Some(link) = a.tail() {
+              ,*link.borrow_mut() = Rc::clone(&b);
+          }
+          println!("a rc: {}", Rc::strong_count(&a));
+          println!("b rc: {}", Rc::strong_count(&b));
+
+          // Calling tail will result in stack overflow:
+          // println!("a tail: {:?}", a.tail());
+      }
+    #+END_SRC
+
+    #+RESULTS:
+    : a rc: 1
+    : a tail: Some(RefCell { value: Nil })
+    : a rc after creating b: 2
+    : b rc: 1
+    : b tail: Some(RefCell { value: Cons(5, RefCell { value: Nil }) })
+    : a rc: 2
+    : b rc: 2
+
+** Errors
+*** the size for values of type `(dyn std::error::Error + 'static)` cannot be known at compilation time
+
+#+BEGIN_SRC rust
+use std::error::Error;
+fn foo() -> Result<i32, dyn Error> {}
+#+END_SRC
+
+- ~Error~ is a trait - so can't be used like a concrete type - must be implemented
+- https://doc.rust-lang.org/std/error/trait.Error.html
+- https://stackoverflow.com/questions/60114150/rust-error-the-size-for-values-of-type-dyn-stderrorerror-static-cann
+- https://www.youtube.com/watch?v=YFzF1AHYjes&feature=youtu.be&t=2755
+
+#+NAME: custom-error
+#+BEGIN_SRC rust
+use std::error::Error
+struct MyError { code: i32, }
+impl Error for MyError {}
+#+END_SRC
+
+#+RESULTS: custom-error
+
+- → `main::MyError` doesn't implement `std::fmt::Display`
+
+#+BEGIN_SRC rust
+<<custom-error>>
+fn foo() -> Result<i32, MyError> {}
+#+END_SRC
+- → `main::MyError` doesn't implement `std::fmt::Display`
+
+- custom Error must also implement ~Display~ and ~Debug~
+#+NAME: custom-error-2
+#+BEGIN_SRC rust
+<<custom-error>>
+impl std::fmt::Display for MyError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "MyError: {}", self.code)
+    }
+}
+impl std::fmt::Debug for MyError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "MyError debug")
+    }
+}
+#+END_SRC
+- the ~write~ macro: https://doc.rust-lang.org/std/macro.write.html
+
+#+NAME: foo
+#+BEGIN_SRC rust
+<<custom-error-2>>
+fn foo2() -> Result<i32, MyError> {
+    Ok(42)
+}
+#+END_SRC
+- a custom error does not neccesarily have to be implemented for ~Result~:
+#+BEGIN_SRC rust
+fn foo2() -> Result<i32, dyn std::error::Error> {
+    Err("just an error")
+}
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC rust
+  use std::collections::HashMap;
+  let mut map = HashMap::new();
+  map.insert(42, "the answer");
+
+  fn f() {
+    let r = &map.get(&42);
+    println!("{:?}", r);
+  }
+
+  f();
+#+END_SRC
