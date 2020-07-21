@@ -503,7 +503,7 @@ At the time, this would have failed but with current Rust it's fine:
         // coercion does not come into play, as that only happens for function and
         // method parameters. Smart pointers deref to the underlying value; in this
         // case, we get a RefCell, which implements the `borrow_mut` method.
-        ,*value.borrow_mut() = 42;
+        *value.borrow_mut() = 42;
         println!("a: {:?}", a);
         println!("b: {:?}", b);
         println!("c: {:?}", c);
@@ -579,7 +579,26 @@ At the time, this would have failed but with current Rust it's fine:
   : add fn with MyPointer: 84
 
 *** Interior Mutability
-    
+    #+NAME: interior-mutability-simple.rs
+     #+BEGIN_SRC rust
+       use std::cell::Cell;
+       // interior mutability (https://doc.rust-lang.org/std/cell/struct.Cell.html)
+       #[derive(Debug)]
+       struct Foo {
+           a: u8,
+           b: Cell<u8>,
+       }
+
+       // create an immutable instance
+       let foo1 = Foo { a: 42, b: Cell::new(100) };
+       //foo1.a = 43; // ERROR
+       foo1.b.set(101);
+       println!("{:?}", foo1);
+     #+END_SRC
+
+     #+RESULTS:
+     : Foo { a: 42, b: Cell { value: 101 } }
+
     #+NAME: interior-mutability.rs
     #+BEGIN_SRC rust
       pub trait Messenger {
@@ -780,6 +799,123 @@ At the time, this would have failed but with current Rust it's fine:
     : b tail: Some(RefCell { value: Cons(5, RefCell { value: Nil }) })
     : a rc: 2
     : b rc: 2
+
+*** Cell, RefCell
+    https://doc.rust-lang.org/std/cell/
+**** Crust of Rust: Smart Pointers and Interior Mutability
+     - can't get a ref to what's inside a ~Cell~; can change it, can get copy of what's inside - but no ref
+     - no other refs to what's inside ⇒ it's always safe to mutate
+     - does not implement ~Sync~ - can not exist on multiple threads
+     - with ~Cell~, can have multiple shared references to a thing (like in a graph or thread local)
+     - generally used with small, cheap-to-copy types as that's the only way to get the value
+     - ~UnsafeCell~ - can get a raw pointer to what's inside - but you can also do that with ~Cell~ ??
+**** [[https://stackoverflow.com/questions/30275982/when-i-can-use-either-cell-or-refcell-which-should-i-choose][When I can use either Cell or RefCell, which should I choose?]]
+***** Cell
+      It is a wrapper around T that forbids to share it multiple times at once: you cannot borrow immutably the inner data. This wrapper does not have any overhead, but because of this limitation, you can only do the following operations:
+
+      Set the inner value,
+      Swap the inner value with something else,
+      Copy the inner value (only when T is Copyable, thus).
+
+      Thanks to its limitation, the Cell behaves like an exclusive borrow, aka a &mut T. Therefore, it is always safe to change the inner value. To summarize:
+
+      Advantage: no overhead
+      Advantage: always mutable
+      Limitation: some operations are impossible
+***** RefCell
+      It is a wrapper around T that "removes" the compile-time borrow-checks: the operations that modify the inner value take a shared reference &self to the RefCell. Normally, this would be unsafe, but each modifying operation firstly verify that the value was not previously borrowed. The exclusivity of a mutable borrow is verified at runtime.
+
+      To summarize:
+
+      Limitation: a very small overhead
+      Limitation: not always mutable, if it was previously mutably borrowed (beware, some operations may panic in this case)
+      Advantage: you are not limited with the operations that you can do
+**** More Code
+     #+BEGIN_SRC rust
+       use std::cell::Cell;
+       let foo = Cell::new(42);
+
+       // set interior value ?
+       //foo = 42; // ERROR: expected struct `std::cell::Cell`, found integer
+       foo.set(100);
+
+       // create new Cell instances, holding a copy of foo's internal value
+       let a = foo.clone();
+       let b = foo.clone();
+
+       // get a copy (clone?) of the interior value
+       let x = foo.get();
+       let y = foo.get();
+
+       println!("{:?}, {:?}, {:?}, {}, {}", foo, a, b, x, y);
+
+       // take the value - leaves Default for the type (0 for u8)
+       let c = foo.take();
+       println!("{:?}, {:?}", foo, c);
+     #+END_SRC
+
+     #+RESULTS:
+     : Cell { value: 100 }, Cell { value: 100 }, Cell { value: 100 }, 100, 100
+     : Cell { value: 0 }, 100
+**** Conclusion ?
+     It looks like the main difference between the two is that ~Cell~ lacks the borrow methods - so the interior value cannot be borrowed, only cloned. With ~RefCell~, the value can be borrowed. The same value cannot be borrowed multiple times, except when all borrows are immutable. Basically, the "standard" borrow rules are applied at runtime; if a mutable reference is already taken and an attempt is made to borrow the value again, the program will panic and crash.
+     
+     - runtime error: thread 'main' panicked at 'already borrowed: BorrowMutError'
+     #+BEGIN_SRC rust
+       use std::cell::RefCell;
+       let foo = RefCell::new(42);
+
+       // this is fine; all borrows are immutable
+       let a1 = foo.borrow();
+       let a2 = foo.borrow();
+
+       // the below will pass compilation, but will panic at runtime
+       let a3 = foo.borrow_mut();
+     #+END_SRC
+
+     - runtime error: thread 'main' panicked at 'already mutably borrowed: BorrowError'
+     #+BEGIN_SRC rust
+       use std::cell::RefCell;
+       let foo = RefCell::new(42);
+       let a1 = foo.borrow_mut();
+       let a2 = foo.borrow();
+     #+END_SRC
+
+Both can be used to implement interior mutability, but in different manners; with ~Cell~, we mutate wholesale, whereas with ~RefCell~, we can get a reference through which the value can be modified.
+
+     #+BEGIN_SRC rust
+       use std::cell::Cell;
+       use std::cell::RefCell;
+       #[derive(Debug)]
+       struct Foo {
+           a: u8,
+           b: Cell<u8>,
+           c: RefCell<u8>,
+       }
+
+       // create an immutable instance
+       let foo1 = Foo { a: 42, b: Cell::new(101), c: RefCell::new(102) };
+
+       //foo1.a = 43; // ERROR
+
+       // interior mutability, Cell
+       foo1.b.set(201);
+
+       // interior mutability, RefCell
+       *foo1.c.borrow_mut() = 202;
+       *foo1.c.borrow_mut() = 203;
+       // this also works...
+       let mut c_ref = foo1.c.borrow_mut();
+       *c_ref = 204;
+
+       // but named references stay in scope, so with the following, will panic
+       //let mut d_ref = foo1.c.borrow_mut();
+
+       println!("{:?}", foo1);
+     #+END_SRC
+
+     #+RESULTS:
+     : Foo { a: 42, b: Cell { value: 201 }, c: RefCell { value: <borrowed> } }
 
 ** Errors
 *** the size for values of type `(dyn std::error::Error + 'static)` cannot be known at compilation time
