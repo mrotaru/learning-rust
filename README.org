@@ -800,9 +800,29 @@ At the time, this would have failed but with current Rust it's fine:
     : a rc: 2
     : b rc: 2
 
+*** "Vanilla" References - &, &mut
+    - borrowed values
+    - compiler will allow either one mutable reference, or multiple immutable ones - but never both
+    - references cannot outlive the referenced values
+     #+BEGIN_SRC rust
+       let n = 42;
+       let n_ref = &n;
+       println!("{:?}, {:?}", n, n_ref);
+
+       // fails: missing lifetime specifier
+       fn f1() -> &u32 {
+          let n = 42;
+          let n_ref = &n;
+          n_ref
+       }
+     #+END_SRC
+
 *** Cell, RefCell
     https://doc.rust-lang.org/std/cell/
-**** Crust of Rust: Smart Pointers and Interior Mutability
+    - mainly useful when the borrow checker is difficult/impossible to satisfy
+    - ~RefCell~ does not allocate, but stores some metadata - borrow state (1 word in size) and, at runtime, each borrow will result in checking the borrow state
+    - ~RefCell~ should be avoided for simple cases, where ~&~ will do
+**** [[https://www.youtube.com/watch?v=8O0Nt9qY_vo][Crust of Rust: Smart Pointers and Interior Mutability]]
      - can't get a ref to what's inside a ~Cell~; can change it, can get copy of what's inside - but no ref
      - no other refs to what's inside ⇒ it's always safe to mutate
      - does not implement ~Sync~ - can not exist on multiple threads
@@ -857,7 +877,7 @@ At the time, this would have failed but with current Rust it's fine:
      #+RESULTS:
      : Cell { value: 100 }, Cell { value: 100 }, Cell { value: 100 }, 100, 100
      : Cell { value: 0 }, 100
-**** Conclusion ?
+**** Conclusion
      It looks like the main difference between the two is that ~Cell~ lacks the borrow methods - so the interior value cannot be borrowed, only cloned. With ~RefCell~, the value can be borrowed. The same value cannot be borrowed multiple times, except when all borrows are immutable. Basically, the "standard" borrow rules are applied at runtime; if a mutable reference is already taken and an attempt is made to borrow the value again, the program will panic and crash.
      
      - runtime error: thread 'main' panicked at 'already borrowed: BorrowMutError'
@@ -917,6 +937,26 @@ Both can be used to implement interior mutability, but in different manners; wit
      #+RESULTS:
      : Foo { a: 42, b: Cell { value: 201 }, c: RefCell { value: <borrowed> } }
 
+*** Box
+    - https://doc.rust-lang.org/std/boxed/struct.Box.html
+    - ~Box~ does not need to be imported
+    - allocates stuff on heap - except for [[https://doc.rust-lang.org/nomicon/exotic-sizes.html#zero-sized-types-zsts][zero-sized types]] - no allocation take place
+    - when ~Box~ goes out of scope, mem is dropped (de-allocated?)
+    - once created, a ~Box~ cannot be updated to point to a different value - no ~get~, ~set~, etc
+    - vs ~RefCell~ ? no interior mutability
+     #+BEGIN_SRC rust
+       let foo = Box::new(42);
+       let n = 42;
+       let bar = Box::new(n); // n is on the stack, and on the heap
+       println!("{:?}, {:?}", foo, bar);
+     #+END_SRC
+
+     #+RESULTS:
+     : 42, 42
+
+*** [[https://manishearth.github.io/blog/2015/05/27/wrapper-types-in-rust-choosing-your-guarantees/][Wrapper Types in Rust: Choosing Your Guarantees]]
+    - different smart pointers offer different guarantees, and can be composed (nested) to obtain the required combination
+    - ex: ~Rc<RefCell<T>>~ - ~Rc~ cannot be dereferenced mutably, but ~RefCell~ can - but ~RefCell~ is not reference counted
 ** Errors
 *** the size for values of type `(dyn std::error::Error + 'static)` cannot be known at compilation time
 
@@ -992,3 +1032,96 @@ fn foo2() -> Result<i32, dyn std::error::Error> {
 
   f();
 #+END_SRC
+*** cannot borrow *self as mutable more than once at a time
+    - https://www.reddit.com/r/rust/comments/hv2zqo/patterns_to_avoid_borrowing_mutable_self_more/
+     #+BEGIN_SRC rust
+       use std::collections::HashMap;
+       #[derive(Debug)]
+       struct Foo {
+           a: HashMap<u8, String>,
+           b: u8,
+       }
+       impl Foo {
+           fn m1(&mut self) {
+               self.a.insert(1, "first".to_string());
+               self.b = 42;
+           }
+           fn m2(&mut self) {
+               let a = &mut self.a;
+               let b = &mut self.b;
+               a.insert(2, "second".to_string());
+               ,*b = 100;
+           }
+           fn m3(&mut self) {
+               let mut a = self.get_a_mut();
+               let mut b = self.get_b_mut();
+               // With just the code above, compilation is ok - which is a bit weird, since now both a and b have caused
+               // a mutable borrow each - but apparently it is not an issue until second borrow is actually used - which
+               // results in "cannot borrow *self as mutable more than once at a time":
+               // a.insert(3, "third".to_string());
+           }
+           fn m4(&mut self) {
+               let mut a = self.get_a_mut();
+               a.insert(4, "fourth".to_string());
+               let mut b = self.get_b_mut();
+               *b = 101;
+           }
+           fn get_a_mut(&mut self) -> &mut HashMap<u8, String> { &mut self.a }
+           fn get_b_mut(&mut self) -> &mut u8 { &mut self.b }
+       }
+
+       let mut f1 = Foo { a: HashMap::new(), b: 0 };
+       f1.m1();
+       f1.m2();
+       f1.m3();
+       f1.m4();
+       println!("{:?}", f1);
+     #+END_SRC
+
+      - can be worked around with ~RefCell~:
+
+      #+BEGIN_SRC rust
+        //use std::cell::Cell;
+        use std::cell::RefCell;
+        use std::collections::HashMap;
+        #[derive(Debug)]
+        struct Foo {
+            a: RefCell<HashMap<u8, String>>,
+            b: u8,
+        }
+        impl Foo {
+            fn m1(&mut self) {
+                self.a.borrow_mut().insert(1, "first".to_string());
+                self.b = 42;
+            }
+            fn m2(&mut self) {
+                let a = &mut self.a.borrow_mut();
+                let b = &mut self.b;
+                a.insert(2, "second".to_string());
+                *b = 100;
+            }
+            fn m3(&mut self) {
+                let mut a = &mut self.get_a_mut();
+                let mut b = self.get_b_mut();
+                // a.insert(3, "third".to_string());
+            }
+            fn m4(&mut self) {
+                let mut a = self.get_a_mut();
+                a.insert(4, "fourth".to_string());
+                let mut b = self.get_b_mut();
+                *b = 101;
+            }
+            fn get_a_mut(&mut self) -> &mut HashMap<u8, String> { &mut self.a.borrow_mut() }
+            fn get_b_mut(&mut self) -> &mut u8 { &mut self.b }
+        }
+
+        let mut f1 = Foo { a: RefCell::new(HashMap::new()), b: 0 };
+        f1.m1();
+        f1.m2();
+        f1.m3();
+        f1.m4();
+        println!("{:?}", f1);
+      #+END_SRC
+
+       #+RESULTS:
+       
